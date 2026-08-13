@@ -206,14 +206,15 @@ async function fetchDetail(sku){
   return await res.json();
 }
 async function saveProduct(sku, stock, estado){
-  const body = new URLSearchParams();
-  body.set('action', 'actualizar_stock');
-  body.set('sku', sku);
-  body.set('stock', stock);
-  body.set('estado', estado);
-  const res = await fetch(BASE, { method:'POST', body });
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  try { return await res.json(); } catch(e){ return {}; }
+  // El backend espera JSON en el cuerpo (JSON.parse(e.postData.contents) en doPost).
+  // Se manda como string plano (Content-Type text/plain por defecto) para evitar
+  // el problema de redirección/CORS que Apps Script tiene con POST + JSON explícito.
+  const payload = JSON.stringify({ action:'actualizar_stock', sku, stock, estado });
+  // mode:'no-cors' porque Apps Script no deja leer la respuesta de un POST directo
+  // desde el navegador; por eso verificamos el guardado con una lectura aparte.
+  await fetch(BASE, { method:'POST', mode:'no-cors', body: payload });
+  await new Promise(r => setTimeout(r, 900));
+  return await fetchDetail(sku);
 }
 
 // ================= ACCIONES =================
@@ -276,13 +277,17 @@ async function saveChanges(){
   state.saveMsg = null;
   render();
   try{
-    await saveProduct(state.selectedSku, state.editStock, state.editEstado);
-    state.saveOk = true;
-    state.saveMsg = 'Guardado correctamente.';
+    const fresh = await saveProduct(state.selectedSku, state.editStock, state.editEstado);
+    const freshStock = String(pick(fresh,'Stock') ?? '');
+    const freshEstado = pick(fresh,'Estado') || '';
+    const matched = freshStock === String(state.editStock) && freshEstado === state.editEstado;
+    state.detail = fresh;
+    state.saveOk = matched;
+    state.saveMsg = matched ? 'Guardado correctamente.' : 'No se pudo confirmar el guardado. Intenta de nuevo.';
     const idx = state.products.findIndex(p => pick(p,'SKU') === state.selectedSku);
-    if(idx > -1){
-      state.products[idx]['Stock'] = state.editStock;
-      state.products[idx]['Estado'] = state.editEstado;
+    if(idx > -1 && matched){
+      state.products[idx]['Stock'] = freshStock;
+      state.products[idx]['Estado'] = freshEstado;
     }
   }catch(err){
     state.saveOk = false;
@@ -337,7 +342,7 @@ function renderListBody(){
     const categoria = pick(p,'Categoria') || '';
     const estado = pick(p,'Estado') || '';
     const stock = pick(p,'Stock');
-    const foto = pick(p,'Foto_1_URL','foto1url');
+    const foto = pick(p,'Foto_1_URL','foto1url','foto1');
     const b = stockBadge(stock);
     const thumb = foto
       ? '<img src="' + esc(foto) + '" onerror="this.parentNode.innerHTML=' + JSON.stringify(esc(String(nombre).charAt(0).toUpperCase())) + '">'
@@ -373,7 +378,8 @@ function renderDetail(){
   const sub = pick(d,'Subcategoria') || '';
   const precio = pick(d,'Precio_USD','precio');
   const costo = pick(d,'Costo_USD','costo');
-  const margen = pick(d,'Margen_USD','margen');
+  const costoNum = Number(costo), precioNum = Number(precio);
+  const margen = (!isNaN(costoNum) && !isNaN(precioNum)) ? (precioNum - costoNum) : undefined;
   const wa = pick(d,'Link_WhatsApp','whatsapp');
   const sku = pick(d,'SKU') || state.selectedSku;
 
