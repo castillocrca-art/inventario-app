@@ -306,7 +306,7 @@ function renderTabs(){
   const tabs = ACCOUNTS.map(a => {
     const active = a.id === state.account;
     const style = active ? ('background:' + accentFor(a.id) + ';') : '';
-    return '<button class="tab' + (active?' active':'') + '" style="' + style + '" onclick="selectAccount(' + JSON.stringify(a.id) + ')">'
+    return '<button class="tab' + (active?' active':'') + '" style="' + style + '" onclick="selectAccount(\'' + a.id + '\')">'
       + '<span class="dot" style="background:' + accentFor(a.id) + '"></span>' + esc(a.label) + '</button>';
   }).join('');
   return '<div class="tabs">' + tabs + '</div>';
@@ -345,7 +345,7 @@ function renderListBody(){
     const foto = pick(p,'Foto_1_URL','foto1url','foto1');
     const b = stockBadge(stock);
     const thumb = foto
-      ? '<img src="' + esc(foto) + '" onerror="this.parentNode.innerHTML=' + JSON.stringify(esc(String(nombre).charAt(0).toUpperCase())) + '">'
+      ? '<img src="' + esc(foto) + '" onerror="this.parentNode.innerHTML=\'' + esc(String(nombre).charAt(0).toUpperCase()) + '\'">'
       : esc(String(nombre).charAt(0).toUpperCase());
     return '<div class="card" onclick="openProductAt(' + i + ')">'
       + '<div class="card-stripe" style="background:' + accentFor(cuenta) + '"></div>'
